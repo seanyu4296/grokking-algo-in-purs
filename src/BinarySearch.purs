@@ -8,7 +8,6 @@ import Debug.Trace (trace)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 
-
 -- | Binary Search - input is a sorted list of elements
 -- | Big o notation - log n
 -- | Traveling salesman - O (n!)
@@ -20,9 +19,9 @@ binarysearch x arr low high
       mid = (high + low) / 2
     in
       arr !! mid
-        >>= case _ of
+        >>= case _ of  
             item
-              | item == x -> Just item
+              | item == x -> Just mid
             item
               | item > x -> binarysearch x arr low (mid - 1)
             item
