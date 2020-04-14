@@ -16,6 +16,7 @@ import Effect.Class.Console (logShow)
 -- | Use breadth-first search
 -- | Graph - nodes, edges, neighbors
 -- | Breadth first search answers two questions -  is there a path from node a to node b, what is the shortest path
+-- | Breadth-first search takes O(number of people + number of edges), and it’s more commonly written as O(V+E) (V for number of vertices, E for number of edges).
 sampleGraph :: Map String (Array String)
 sampleGraph =
   Map.fromFoldable
