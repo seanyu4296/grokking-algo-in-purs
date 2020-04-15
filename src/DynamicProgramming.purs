@@ -2,7 +2,8 @@ module GrokkingAlgos.DynamicProgramming where
 
 import Prelude
 import Control.Alt ((<|>))
-import Data.Array (catMaybes, foldl, insertAt, length, range, snoc, (!!), (:))
+import Control.MonadZero (guard)
+import Data.Array (catMaybes, foldl, updateAt, length, range, snoc, (!!), (:))
 import Data.Foldable (sum)
 import Data.FoldableWithIndex (foldlWithIndex)
 import Data.Map (Map)
@@ -13,7 +14,7 @@ import Data.Set as Set
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable as Unfoldable
-import Debug.Trace (trace)
+import Debug.Trace (spy, trace)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import Partial.Unsafe (unsafePartial)
@@ -26,10 +27,11 @@ type ItemSpec
 sampleItems :: Map String ItemSpec
 sampleItems =
   Map.fromFoldable
-    [ ("stereo" /\ { weight: 4, price: 3000 })
-    --    , ("laptop" /\ { weight: 3, price: 2000 })
-    , ("guitar" /\ { weight: 1, price: 1500 })
-    --    , ("iphone" /\ { weight: 1, price: 2000 })
+    [ ("guitar" /\ { weight: 1, price: 1500 })
+    , ("stereo" /\ { weight: 4, price: 3000 })
+    , ("laptop" /\ { weight: 3, price: 2000 })
+    , ("iphone" /\ { weight: 1, price: 2000 })
+    , ("keyboard" /\ { weight: 2, price: 2500 })
     ]
 
 gcd' :: Array Int -> Maybe Int
@@ -55,7 +57,7 @@ solve itemMap maxWeight =
 
   allWeight = allValues <#> \v -> (snd v).weight
 
-  allItems = allValues <#> fst
+  allItems = spy "ITEMS: " $ allValues <#> fst
 
   gcf = unsafePartial $ fromJust $ gcd' allWeight
 
@@ -63,58 +65,76 @@ solve itemMap maxWeight =
 
   y :: Grid
   y =
-    foldlWithIndex
-      ( \rowIdx grid item ->
-          foldlWithIndex
-            ( \columnIdx accGrid _ ->
-                let
-                  currentItemWeight :: Maybe Int
-                  currentItemWeight = (Map.lookup item itemMap) <#> _.weight
+    spy "GRid: "
+      $ foldlWithIndex
+          ( \rowIdx grid item ->
+              foldlWithIndex
+                ( \columnIdx accGrid _ ->
+                    let
+                      currentItem :: Maybe ItemSpec
+                      currentItem = (Map.lookup item itemMap)
 
-                  previousItems :: (Array String)
-                  previousItems = getItemsFromGrid accGrid (rowIdx - 1) columnIdx
+                      previousItems :: (Array String)
+                      previousItems = getItemsFromGrid accGrid (rowIdx - 1) columnIdx
 
-                  totalWeightPrev :: Int
-                  totalWeightPrev = getTotalWeightItems previousItems
+                      currentGridWeight = getWeightForColumn columnIdx
 
-                  currentGridWeight = getWeightForColumn columnIdx
+                      firstcand :: { price :: Int, items :: Array String }
+                      firstcand =
+                        fromMaybe { price: 0, items: [] }
+                          $ do
+                              currentI <- currentItem
+                              guard (currentI.weight <= currentGridWeight)
+                              let
+                                remainingWeight = currentGridWeight - currentI.weight
 
-                  x =
-                    fromMaybe []
-                      $ do
-                          ciw <- currentItemWeight
-                          if ciw <= currentGridWeight then
-                            let
-                              remainingWeight = currentGridWeight - ciw
+                                columnToGet = getColumnForWeight remainingWeight
 
-                              columnToGet = getColumnForWeight remainingWeight
+                                additionalItems = getItemsFromGrid accGrid (rowIdx - 1) columnToGet
 
-                              additionalItems = getItemsFromGrid accGrid (rowIdx - 1) columnToGet
-                            in
-                              pure $ insertItemsToGrid accGrid rowIdx columnIdx (item : additionalItems)
+                                allItems = (item : additionalItems)
+                              pure $ { price: getTotalPriceItems (item : additionalItems), items: allItems }
+
+                      secondcand :: { price :: Int, items :: Array String }
+                      secondcand =
+                        let
+                          prevPrice = getTotalPriceItems previousItems
+
+                          remainingWeight = currentGridWeight - getTotalWeightItems previousItems
+
+                          columnToGet = getColumnForWeight remainingWeight
+
+                          additionalItems = getItemsFromGrid accGrid (rowIdx - 2) columnToGet
+
+                          allItems = Set.toUnfoldable <<< Set.fromFoldable $ (previousItems <> additionalItems)
+                        in
+                          { price: getTotalPriceItems allItems, items: allItems }
+                    in
+                      insertItemsToGrid accGrid rowIdx columnIdx
+                        ( if firstcand.price > secondcand.price then
+                            firstcand.items
                           else
-                            pure $ insertItemsToGrid accGrid rowIdx columnIdx previousItems
+                            secondcand.items
+                        )
+                )
+                grid
+                (range 1 numberOfColumns)
+          )
+          ([] :: Grid)
+          allItems
 
-                  afs = trace (x) (const unit)
-                in
-                  x
-            )
-            grid
-            (range 1 numberOfColumns)
-      )
-      ([] :: Grid)
-      allItems
-
-  --  limit = getweightForColumn == maxWeight
   -- Helper function
   getWeightForColumn :: Int -> Int
   getWeightForColumn index = gcf * index + 1
 
   getColumnForWeight :: Int -> Int
-  getColumnForWeight weight = weight / gcf
+  getColumnForWeight weight = (weight / gcf) - 1
 
   getTotalWeightItems :: Array String -> Int
   getTotalWeightItems items = sum $ catMaybes (items <#> \item -> (Map.lookup item itemMap <#> _.weight))
+
+  getTotalPriceItems :: Array String -> Int
+  getTotalPriceItems items = sum $ catMaybes (items <#> \item -> (Map.lookup item itemMap <#> _.price))
 
   getItemsFromGrid :: Grid -> Int -> Int -> Array String
   getItemsFromGrid grid row column =
@@ -129,16 +149,10 @@ solve itemMap maxWeight =
     fromMaybe []
       $ do
           oldRow <- (grid !! row) <|> pure []
-          --          let
-          -- zxzx = trace ("COLUMNIDX:" <> show column) (const unit)
-          -- zxzx1 = trace ("ROWIDX:" <> show row) (const unit)
-          -- zzzx = trace ("OLDROW:" <> show oldRow) (const unit)
-          newRow <- (insertAt column items oldRow) <|> (pure $ snoc oldRow items)
-          --          let
-          -- zzz = trace ("---" <> show newRow <> "----") (const unit)
-          (insertAt row newRow grid) <|> (pure $ snoc grid newRow)
+          newRow <- (updateAt column items oldRow) <|> (pure $ snoc oldRow items)
+          (updateAt row newRow grid) <|> (pure $ snoc grid newRow)
 
 --    Array String -> Array (Maybe Int) -> Array Int -> Int
 main :: Effect Unit
 main = do
-  logShow $ solve sampleItems 4
+  logShow $ solve sampleItems 5
