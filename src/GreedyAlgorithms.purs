@@ -13,7 +13,6 @@ import Debug.Trace (trace)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 
-
 -- Stations problem
 sampleStations :: Map String (Set String)
 sampleStations =

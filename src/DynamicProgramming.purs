@@ -2,7 +2,7 @@ module GrokkingAlgos.DynamicProgramming where
 
 import Prelude
 import Control.Alt ((<|>))
-import Control.MonadZero (guard)
+import Control.MonadZero (empty, guard)
 import Data.Array (catMaybes, foldl, updateAt, length, range, snoc, (!!), (:))
 import Data.Foldable (sum)
 import Data.FoldableWithIndex (foldlWithIndex)
@@ -11,6 +11,8 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromJust, fromMaybe)
 import Data.Set (Set)
 import Data.Set as Set
+import Data.String as Str
+import Data.String.CodeUnits (toCharArray)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable as Unfoldable
@@ -151,6 +153,62 @@ solve itemMap maxWeight =
           oldRow <- (grid !! row) <|> pure []
           newRow <- (updateAt column items oldRow) <|> (pure $ snoc oldRow items)
           (updateAt row newRow grid) <|> (pure $ snoc grid newRow)
+
+-- Longest subsequence
+type Grid2
+  = Array (Array Int)
+
+lcs :: String -> String -> Int
+lcs word1 word2 =
+  fromMaybe 0
+    ( do
+        row <- grid !! longestWordL
+        row !! longestWordL
+    )
+  where
+  longestWordL = max (Str.length word1) (Str.length word2)
+
+  word1Chars = toCharArray word1
+
+  word2Chars = toCharArray word2
+
+  grid =
+    foldlWithIndex
+      ( \rowIdx accGrid row ->
+          foldlWithIndex
+            ( \colIdx accGrid2 cell ->
+                accGrid2
+            -- let
+            --   word1Char = word1Chars !! rowIdx
+            --   word2Char = word2Chars !! colIdx
+            -- in
+            --   if word1Char == word2Char then
+            --   else
+            )
+            accGrid
+            (range 1 longestWordL)
+      )
+      ([] :: Grid2)
+      (range 1 longestWordL)
+
+  getCellFromGrid :: forall a. Grid_ a -> Int -> Int -> Maybe a
+  getCellFromGrid grid row column = do
+    row' <- grid !! row
+    items <- row' !! column
+    pure $ items
+
+  insertValToGrid :: forall a. Grid_ a -> Int -> Int -> a -> Grid_ a
+  insertValToGrid grid row column newVal =
+    fromMaybe []
+      $ do
+          oldRow <- (grid !! row) <|> pure []
+          newRow <- (updateAt column newVal oldRow) <|> (pure $ snoc oldRow newVal)
+          (updateAt row newRow grid) <|> (pure $ snoc grid newRow)
+
+-- newRow <- (updateAt column newVal oldRow) <|> (pure $ snoc oldRow newVal)
+-- (updateAt row newRow grid) <|> (pure $ snoc grid newRow)
+type Grid_ a
+  = Array (Array a)
 
 --    Array String -> Array (Maybe Int) -> Array Int -> Int
 main :: Effect Unit
