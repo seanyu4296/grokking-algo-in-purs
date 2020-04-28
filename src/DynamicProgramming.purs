@@ -2,21 +2,18 @@ module GrokkingAlgos.DynamicProgramming where
 
 import Prelude
 import Control.Alt ((<|>))
-import Control.MonadZero (empty, guard)
+import Control.MonadZero (guard)
 import Data.Array (catMaybes, foldl, updateAt, length, range, snoc, (!!), (:))
 import Data.Foldable (sum)
 import Data.FoldableWithIndex (foldlWithIndex)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromJust, fromMaybe)
-import Data.Set (Set)
 import Data.Set as Set
 import Data.String as Str
 import Data.String.CodeUnits (toCharArray)
-import Data.Tuple (Tuple(..), fst, snd)
+import Data.Tuple (Tuple, fst, snd)
 import Data.Tuple.Nested ((/\))
-import Data.Unfoldable as Unfoldable
-import Debug.Trace (spy, trace)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 import Partial.Unsafe (unsafePartial)
@@ -43,87 +40,81 @@ gcd' =
     )
     Nothing
 
-type Grid
-  = Array (Array (Array String))
+type KnapsackGrid
+  = Grid (Array String)
 
 solve :: Map String ItemSpec -> Int -> Array String
-solve itemMap maxWeight =
-  fromMaybe []
-    ( do
-        row <- y !! (length allValues - 1)
-        row !! (numberOfColumns - 1)
-    )
+solve itemMap maxWeight = getItemsFromGrid grid (length allValues - 1) (numberOfColumns - 1)
   where
   allValues :: Array (Tuple String ItemSpec)
   allValues = (Map.toUnfoldable itemMap)
 
   allWeight = allValues <#> \v -> (snd v).weight
 
-  allItems = spy "ITEMS: " $ allValues <#> fst
+  allItems = allValues <#> fst
 
   gcf = unsafePartial $ fromJust $ gcd' allWeight
 
   numberOfColumns = maxWeight / gcf
 
-  y :: Grid
-  y =
-    spy "GRid: "
-      $ foldlWithIndex
-          ( \rowIdx grid item ->
-              foldlWithIndex
-                ( \columnIdx accGrid _ ->
+  grid :: KnapsackGrid
+  grid =
+    foldlWithIndex
+      ( \rowIdx accGrid item ->
+          foldlWithIndex
+            ( \columnIdx accGrid2 _ ->
+                let
+                  currentItem :: Maybe ItemSpec
+                  currentItem = (Map.lookup item itemMap)
+
+                  previousItems :: (Array String)
+                  previousItems = getItemsFromGrid accGrid2 (rowIdx - 1) columnIdx
+
+                  currentGridWeight = getWeightForColumn columnIdx
+
+                  firstcand :: { price :: Int, items :: Array String }
+                  firstcand =
+                    fromMaybe { price: 0, items: [] }
+                      $ do
+                          currentI <- currentItem
+                          guard (currentI.weight <= currentGridWeight)
+                          let
+                            remainingWeight = currentGridWeight - currentI.weight
+
+                            columnToGet = getColumnForWeight remainingWeight
+
+                            additionalItems = getItemsFromGrid accGrid2 (rowIdx - 1) columnToGet
+
+                            allItems = (item : additionalItems)
+                          pure $ { price: getTotalPriceItems (item : additionalItems), items: allItems }
+
+                  secondcand :: { price :: Int, items :: Array String }
+                  secondcand =
                     let
-                      currentItem :: Maybe ItemSpec
-                      currentItem = (Map.lookup item itemMap)
+                      prevPrice = getTotalPriceItems previousItems
 
-                      previousItems :: (Array String)
-                      previousItems = getItemsFromGrid accGrid (rowIdx - 1) columnIdx
+                      remainingWeight = currentGridWeight - getTotalWeightItems previousItems
 
-                      currentGridWeight = getWeightForColumn columnIdx
+                      columnToGet = getColumnForWeight remainingWeight
 
-                      firstcand :: { price :: Int, items :: Array String }
-                      firstcand =
-                        fromMaybe { price: 0, items: [] }
-                          $ do
-                              currentI <- currentItem
-                              guard (currentI.weight <= currentGridWeight)
-                              let
-                                remainingWeight = currentGridWeight - currentI.weight
+                      additionalItems = getItemsFromGrid accGrid2 (rowIdx - 2) columnToGet
 
-                                columnToGet = getColumnForWeight remainingWeight
-
-                                additionalItems = getItemsFromGrid accGrid (rowIdx - 1) columnToGet
-
-                                allItems = (item : additionalItems)
-                              pure $ { price: getTotalPriceItems (item : additionalItems), items: allItems }
-
-                      secondcand :: { price :: Int, items :: Array String }
-                      secondcand =
-                        let
-                          prevPrice = getTotalPriceItems previousItems
-
-                          remainingWeight = currentGridWeight - getTotalWeightItems previousItems
-
-                          columnToGet = getColumnForWeight remainingWeight
-
-                          additionalItems = getItemsFromGrid accGrid (rowIdx - 2) columnToGet
-
-                          allItems = Set.toUnfoldable <<< Set.fromFoldable $ (previousItems <> additionalItems)
-                        in
-                          { price: getTotalPriceItems allItems, items: allItems }
+                      allItems = Set.toUnfoldable <<< Set.fromFoldable $ (previousItems <> additionalItems)
                     in
-                      insertItemsToGrid accGrid rowIdx columnIdx
-                        ( if firstcand.price > secondcand.price then
-                            firstcand.items
-                          else
-                            secondcand.items
-                        )
-                )
-                grid
-                (range 1 numberOfColumns)
-          )
-          ([] :: Grid)
-          allItems
+                      { price: getTotalPriceItems allItems, items: allItems }
+                in
+                  insertValToGrid accGrid2 rowIdx columnIdx
+                    ( if firstcand.price > secondcand.price then
+                        firstcand.items
+                      else
+                        secondcand.items
+                    )
+            )
+            accGrid
+            (range 1 numberOfColumns)
+      )
+      ([] :: KnapsackGrid)
+      allItems
 
   -- Helper function
   getWeightForColumn :: Int -> Int
@@ -138,34 +129,18 @@ solve itemMap maxWeight =
   getTotalPriceItems :: Array String -> Int
   getTotalPriceItems items = sum $ catMaybes (items <#> \item -> (Map.lookup item itemMap <#> _.price))
 
-  getItemsFromGrid :: Grid -> Int -> Int -> Array String
-  getItemsFromGrid grid row column =
-    fromMaybe []
-      $ do
-          row' <- grid !! row
-          items <- row' !! column
-          pure $ items
-
-  insertItemsToGrid :: Grid -> Int -> Int -> Array String -> Grid
-  insertItemsToGrid grid row column items =
-    fromMaybe []
-      $ do
-          oldRow <- (grid !! row) <|> pure []
-          newRow <- (updateAt column items oldRow) <|> (pure $ snoc oldRow items)
-          (updateAt row newRow grid) <|> (pure $ snoc grid newRow)
+  getItemsFromGrid :: KnapsackGrid -> Int -> Int -> Array String
+  getItemsFromGrid g x y = fromMaybe [] $ getCellFromGrid g x y
 
 -- Longest subsequence
-type Grid2
-  = Array (Array Int)
+type LCSGrid
+  = Grid Int
 
 lcs :: String -> String -> Int
-lcs word1 word2 =
-  fromMaybe 0
-    ( do
-        row <- grid !! longestWordL
-        row !! longestWordL
-    )
+lcs word1 word2 = fromMaybe 0 getBtmRightCell
   where
+  getBtmRightCell = getCellFromGrid grid (longestWordL - 1) (longestWordL - 1)
+
   longestWordL = max (Str.length word1) (Str.length word2)
 
   word1Chars = toCharArray word1
@@ -177,40 +152,54 @@ lcs word1 word2 =
       ( \rowIdx accGrid row ->
           foldlWithIndex
             ( \colIdx accGrid2 cell ->
-                accGrid2
-            -- let
-            --   word1Char = word1Chars !! rowIdx
-            --   word2Char = word2Chars !! colIdx
-            -- in
-            --   if word1Char == word2Char then
-            --   else
+                let
+                  word1Char = word1Chars !! rowIdx
+
+                  word2Char = word2Chars !! colIdx
+
+                  insertval = insertValToGrid accGrid2 rowIdx colIdx
+                in
+                  insertval
+                    $ if word1Char == word2Char then
+                        fromMaybe 0 (getLeftDiagCell accGrid2 rowIdx colIdx) + 1
+                      else
+                        fromMaybe 0 $ max (getTopAdjCell accGrid2 rowIdx colIdx) (getLeftAdjCell accGrid2 rowIdx colIdx)
             )
             accGrid
             (range 1 longestWordL)
       )
-      ([] :: Grid2)
+      ([] :: LCSGrid)
       (range 1 longestWordL)
 
-  getCellFromGrid :: forall a. Grid_ a -> Int -> Int -> Maybe a
-  getCellFromGrid grid row column = do
-    row' <- grid !! row
-    items <- row' !! column
-    pure $ items
+  getLeftDiagCell :: forall a. Grid a -> Int -> Int -> Maybe a
+  getLeftDiagCell g x y = getCellFromGrid g (x - 1) (y - 1)
 
-  insertValToGrid :: forall a. Grid_ a -> Int -> Int -> a -> Grid_ a
-  insertValToGrid grid row column newVal =
-    fromMaybe []
-      $ do
-          oldRow <- (grid !! row) <|> pure []
-          newRow <- (updateAt column newVal oldRow) <|> (pure $ snoc oldRow newVal)
-          (updateAt row newRow grid) <|> (pure $ snoc grid newRow)
+  getTopAdjCell :: forall a. Grid a -> Int -> Int -> Maybe a
+  getTopAdjCell g x y = getCellFromGrid g (x - 1) y
 
--- newRow <- (updateAt column newVal oldRow) <|> (pure $ snoc oldRow newVal)
--- (updateAt row newRow grid) <|> (pure $ snoc grid newRow)
-type Grid_ a
+  getLeftAdjCell :: forall a. Grid a -> Int -> Int -> Maybe a
+  getLeftAdjCell g x y = getCellFromGrid g x (y - 1)
+
+-- Helper Functions For Grid
+type Grid a
   = Array (Array a)
 
---    Array String -> Array (Maybe Int) -> Array Int -> Int
+getCellFromGrid :: forall a. Grid a -> Int -> Int -> Maybe a
+getCellFromGrid grid row column = do
+  row' <- grid !! row
+  items <- row' !! column
+  pure $ items
+
+insertValToGrid :: forall a. Grid a -> Int -> Int -> a -> Grid a
+insertValToGrid grid row column newVal =
+  fromMaybe []
+    $ do
+        oldRow <- (grid !! row) <|> pure []
+        newRow <- (updateAt column newVal oldRow) <|> (pure $ snoc oldRow newVal)
+        (updateAt row newRow grid) <|> (pure $ snoc grid newRow)
+
+-- Main
 main :: Effect Unit
 main = do
   logShow $ solve sampleItems 5
+  logShow $ lcs "fish" "fosh"
