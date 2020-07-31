@@ -1,23 +1,22 @@
-module SelectionSort where
+module GrokkingAlgos.SelectionSort where
 
 import Prelude
+
 import Data.Foldable (minimum)
 import Data.List (List(..), delete, (:))
 import Data.Maybe (Maybe(..), fromJust)
-import Debug.Trace (traceM)
 import Effect (Effect)
+import Effect.Class.Console (logShow)
 import Partial.Unsafe (unsafePartial)
 
 -- PARTIAL
--- // TODO: ask jv partial functions in haskell
--- // TODO: when to use partial functions
 selectionsort :: List Int -> List Int
 selectionsort Nil = Nil
 
 selectionsort l = minVal : (selectionsort rest)
   where
   minVal :: Int
-  minVal = unsafePartial (fromJust (minimum l))
+  minVal = unsafePartial $ fromJust $ minimum l
 
   rest :: List Int
   rest = delete minVal l
@@ -36,8 +35,8 @@ selectionsort' l = do
 --
 main :: Effect Unit
 main = do
-  traceM $ selectionsort (1 : 2 : 3 : 5 : 4 : Nil)
-  traceM $ selectionsort' (1 : 2 : 3 : 5 : 4 : Nil)
+  logShow $ selectionsort $ 1 : 2 : 3 : 5 : 4 : Nil
+  logShow $ selectionsort' $ 1 : 2 : 3 : 5 : 4 : Nil
 
 
 {-

@@ -1,10 +1,9 @@
-module BinarySearch where
+module GrokkingAlgos.BinarySearch where
 
 import Prelude
 import Data.Array ((!!))
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
-import Debug.Trace (trace)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
 
@@ -19,7 +18,7 @@ binarysearch x arr low high
       mid = (high + low) / 2
     in
       arr !! mid
-        >>= case _ of  
+        >>= case _ of
             item
               | item == x -> Just mid
             item

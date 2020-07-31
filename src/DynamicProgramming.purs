@@ -202,4 +202,4 @@ insertValToGrid grid row column newVal =
 main :: Effect Unit
 main = do
   logShow $ solve sampleItems 5
-  logShow $ lcs "fish" "fosh"
+  logShow $ lcs "sean" "efasdan"
