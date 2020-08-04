@@ -1,0 +1,1 @@
+cp src/$1 ../grokking_algorithms/$2/Purescript/$1
