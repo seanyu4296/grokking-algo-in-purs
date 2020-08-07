@@ -32,7 +32,7 @@ sampleGraph =
 
 -- check first degree
 -- add if not there yet
--- keep list of checked already
+-- keep list of checked already -- might end up with infinite loop
 bfs :: String -> Map String (Array String) -> (String -> Boolean) -> Maybe String
 bfs start graph checker = do
   connections <- Map.lookup start graph

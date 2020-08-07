@@ -1,7 +1,6 @@
 module GrokkingAlgos.SelectionSort where
 
 import Prelude
-
 import Data.Foldable (minimum)
 import Data.List (List(..), delete, (:))
 import Data.Maybe (Maybe(..))
