@@ -7,12 +7,12 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Set (Set)
 import Data.Set as Set
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
-import Debug.Trace (trace)
 import Effect (Effect)
 import Effect.Class.Console (logShow)
-
+-- | Greedy algorithm gets you "good" solutions
+-- | You pick the locally optimal solution. The most "precious"
 -- Stations problem
 sampleStations :: Map String (Set String)
 sampleStations =
